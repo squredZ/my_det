@@ -30,11 +30,11 @@ import torch.distributed as dist
 import torch.backends.cudnn as cudnn
 from torch.utils.data import DataLoader
 from torchvision import transforms
-from configs.config_coco_trans import Config
+from train_config import Config
 from public.detection.dataset.cocodataset import COCODataPrefetcher, Collater
 from public.detection.models.loss import FCOSLoss
 from public.detection.models.decode import FCOSDecoder
-from public.detection.models import fcos
+from model.fcos import FCOS
 from public.imagenet.utils import get_logger
 from pycocotools.cocoeval import COCOeval
 
@@ -262,13 +262,7 @@ def main():
     if local_rank == 0:
         logger.info('finish loading data')
 
-    model = fcos.__dict__[args.network](**{
-        "pretrained": args.pretrained,
-        "num_classes": args.num_classes,
-        "use_TransConv": args.use_TransConv,
-        "use_gn": args.use_gn,
-        "fpn_bn": args.fpn_bn
-    })
+    model = FCOS(config=Config)
 
     for name, param in model.named_parameters():
         if local_rank == 0:
@@ -430,7 +424,7 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, args):
         else:
             loss.backward()
 
-        torch.nn.utils.clip_grad_norm_(model.parameters(), 0.1)
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 3)
         optimizer.step()
         optimizer.zero_grad()
 

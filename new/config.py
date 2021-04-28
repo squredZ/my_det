@@ -27,14 +27,14 @@ class DefaultConfig():
 
 class YolofDC5Config():
         #backbone
-    pretrained=True
+    pretrained=False
     freeze_stage_1=True
     freeze_bn=True
 
     #fpn
     use_yolof = True
     C5_inplanes = 512 * 4
-    fpn_out_channels=256
+    fpn_out_channels=512
     use_p5=True
     
     #head
@@ -47,6 +47,7 @@ class YolofDC5Config():
     #training
     strides=[16]
     limit_range=[[-1,512]]
+    scales = [1.0]
 
     #inference
     score_threshold=0.05
