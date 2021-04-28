@@ -13,6 +13,8 @@ from public.detection.models.anchor import FCOSPositions
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from config import YolofDC5Config
+from fpn_neck import YolofDC5FPN
 
 
 
@@ -26,8 +28,6 @@ class FCOS(nn.Module):
             self.fpn=YolofDC5FPN(C5_inplanes=config.C5_inplanes)
         else:
             self.fpn=FPN(config.fpn_out_channels,use_p5=config.use_p5)
-        self.head=ClsCntRegHead(config.fpn_out_channels,config.class_num,
-                                config.use_GN_head,config.cnt_on_reg,config.prior)
 
         self.num_classes = config.class_num
         self.planes = config.fpn_out_channels
@@ -36,8 +36,8 @@ class FCOS(nn.Module):
                                                 self.num_classes,
                                                 num_layers=4,
                                                 prior=0.01,
-                                                use_gn=True,
-                                                cnt_on_reg=True)
+                                                use_gn=config.use_GN_head,
+                                                cnt_on_reg=config.cnt_on_reg)
 
         self.strides = torch.tensor(config.strides, dtype=torch.float)
         self.positions = FCOSPositions(self.strides)
@@ -111,44 +111,11 @@ class FCOS(nn.Module):
         return cls_heads, reg_heads, center_heads, batch_positions
 
 
-def _fcos(arch, pretrained, **kwargs):
-    model = FCOS(arch, **kwargs)
-    # only load state_dict()
-    if pretrained:
-        pretrained_models = torch.load(model_urls[arch + "_fcos"],
-                                       map_location=torch.device('cpu'))
-        # del pretrained_models['cls_head.cls_head.8.weight']
-        # del pretrained_models['cls_head.cls_head.8.bias']
-
-        # only load state_dict()
-        model.load_state_dict(pretrained_models, strict=False)
-
-    return model
-
-
-def resnet18_fcos(pretrained=False, **kwargs):
-    return _fcos('resnet18', pretrained, **kwargs)
-
-
-def resnet34_fcos(pretrained=False, **kwargs):
-    return _fcos('resnet34', pretrained, **kwargs)
-
-
-def resnet50_fcos(pretrained=False, **kwargs):
-    return _fcos('resnet50', pretrained, **kwargs)
-
-
-def resnet101_fcos(pretrained=False, **kwargs):
-    return _fcos('resnet101', pretrained, **kwargs)
-
-
-def resnet152_fcos(pretrained=False, **kwargs):
-    return _fcos('resnet152', pretrained, **kwargs)
 
 
 if __name__ == '__main__':
-    net = FCOS(resnet_type="resnet50")
-    image_h, image_w = 600, 600
+    net = FCOS(YolofDC5Config)
+    image_h, image_w = 512, 512
     cls_heads, reg_heads, center_heads, batch_positions = net(
         torch.autograd.Variable(torch.randn(3, 3, image_h, image_w)))
     annotations = torch.FloatTensor([[[113, 120, 183, 255, 5],
