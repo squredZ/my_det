@@ -89,7 +89,7 @@ class EfficientNetBackbone(nn.Module):
 class ResNetBackbone(nn.Module):
     def __init__(self, resnet_type="resnet50"):
         super(ResNetBackbone, self).__init__()
-        self.model = models.__dict__[resnet_type](**{"pretrained": True})
+        self.model = models.__dict__[resnet_type](**{"pretrained": False})
         del self.model.fc
         del self.model.avgpool
 
