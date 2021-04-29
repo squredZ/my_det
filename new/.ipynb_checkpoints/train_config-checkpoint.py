@@ -46,7 +46,7 @@ class Config(object):
                                     Resize(resize=input_image_size),
                                 ]))
     epochs = 24
-    per_node_batch_size = 3
+    per_node_batch_size = 4
     lr = 1e-4
     num_workers = 4
     print_interval = 100
