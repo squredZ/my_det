@@ -50,6 +50,9 @@ class Config(object):
     use_gn = False
     use_TransConv = False
     use_YolofDC5 = True
+    freeze = True
+
+
     epochs = 12
     per_node_batch_size = 12
     lr = 1e-5

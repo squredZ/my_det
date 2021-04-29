@@ -123,6 +123,9 @@ def parse_args():
                         type=bool,
                         default=Config.use_YolofDC5,
                         help="use yolofdc5 head")
+    parser.add_argument("--freeze",
+                        type=bool,
+                        --help="if freeze backbone and fpn")
     
 
     return parser.parse_args()
@@ -273,7 +276,8 @@ def main():
         "use_TransConv": args.use_TransConv,
         "use_YolofDC5": args.use_YolofDC5,
         "use_gn": args.use_gn,
-        "fpn_bn": args.fpn_bn
+        "fpn_bn": args.fpn_bn,
+        "freeze": args.freeze
     })
 
     for name, param in model.named_parameters():
