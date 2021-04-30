@@ -125,14 +125,23 @@ def parse_args():
                         help="use yolofdc5 head")
     parser.add_argument("--freeze",
                         type=bool,
-                        --help="if freeze backbone and fpn")
+                        default=Config.freeze,
+                        help="if freeze backbone and fpn")
+    parser.add_argument("--strides",
+                        type=list,
+                        default=Config.strides,
+                        help="down strides")
+    parser.add_argument("--scales",
+                        type=list,
+                        default=Config.scales,
+                        help="scales param")
     
 
     return parser.parse_args()
 
 
 def validate(val_dataset, model, decoder, args):
-    model = model.module
+#     model = model.module
     # switch to evaluate mode
     model.eval()
     with torch.no_grad():
@@ -277,9 +286,14 @@ def main():
         "use_YolofDC5": args.use_YolofDC5,
         "use_gn": args.use_gn,
         "fpn_bn": args.fpn_bn,
-        "freeze": args.freeze
+        "freeze": args.freeze,
+        "strides": args.strides,
+        "scales": args.scales
     })
 
+    model_l = torch.load("/home/jovyan/data-vol-polefs-1/yolof_dc5_res50_coco667_withImPre/best.pth", map_location="cpu")
+    model.load_state_dict(model_l, strict=False)
+    
     for name, param in model.named_parameters():
         if local_rank == 0:
             logger.info(f"{name},{param.requires_grad}")
@@ -292,9 +306,11 @@ def main():
         logger.info(
             f"model: '{args.network}', flops: {flops}, params: {params}")
 
-    criterion = FCOSLoss().cuda()
+    criterion = FCOSLoss(strides=[16],
+                 mi=[[0,9999]]).cuda()
     decoder = FCOSDecoder(image_w=args.input_image_size,
-                          image_h=args.input_image_size).cuda()
+                          image_h=args.input_image_size,
+                         strides=[16]).cuda()
 
     model = model.cuda()
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
@@ -304,19 +320,19 @@ def main():
 
     if args.sync_bn:
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
-
-    if args.apex:
-        amp.register_float_function(torch, 'sigmoid')
-        amp.register_float_function(torch, 'softmax')
-        model, optimizer = amp.initialize(model, optimizer, opt_level='O1')
-        model = apex.parallel.DistributedDataParallel(model,
-                                                      delay_allreduce=True)
-        if args.sync_bn:
-            model = apex.parallel.convert_syncbn_model(model)
-    else:
-        model = nn.parallel.DistributedDataParallel(model,
-                                                    device_ids=[local_rank],
-                                                    output_device=local_rank)
+#***********************************************************************************************************************
+#     if args.apex:
+#         amp.register_float_function(torch, 'sigmoid')
+#         amp.register_float_function(torch, 'softmax')
+#         model, optimizer = amp.initialize(model, optimizer, opt_level='O1')
+#         model = apex.parallel.DistributedDataParallel(model,
+#                                                       delay_allreduce=True)
+#         if args.sync_bn:
+#             model = apex.parallel.convert_syncbn_model(model)
+#     else:
+#         model = nn.parallel.DistributedDataParallel(model,
+#                                                     device_ids=[local_rank],
+#                                                     output_device=local_rank)
 
     if args.evaluate:
         if not os.path.isfile(args.evaluate):
@@ -418,6 +434,11 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, args):
 
     # switch to train mode
     model.train()
+    if args.freeze:
+        for p in model.backbone.parameters():
+            p.requires_grad = False
+        for p in model.fpn.parameters():
+            p.requires_grad = False
 
     iters = len(train_loader.dataset) // (args.per_node_batch_size * gpus_num)
     prefetcher = COCODataPrefetcher(train_loader)

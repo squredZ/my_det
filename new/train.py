@@ -419,12 +419,13 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, args):
             print(local_rank, "  zero")
             optimizer.zero_grad()
             continue
-
-        if args.apex:
-            with amp.scale_loss(loss, optimizer) as scaled_loss:
-                scaled_loss.backward()
-        else:
-            loss.backward()
+   #****************************************************************************************************************
+        loss.backward()
+#         if args.apex:
+#             with amp.scale_loss(loss, optimizer) as scaled_loss:
+#                 scaled_loss.backward()
+#         else:
+#             loss.backward()
 
         torch.nn.utils.clip_grad_norm_(model.parameters(), 0.1)
         optimizer.step()

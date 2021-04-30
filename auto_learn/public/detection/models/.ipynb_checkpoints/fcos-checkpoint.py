@@ -11,7 +11,7 @@ sys.path.append(BASE_DIR)
 from public.path import pretrained_models_path
 
 from public.detection.models.backbone import ResNetBackbone
-from public.detection.models.fpn import RetinaFPN, RetinaFPN_TransConv
+from public.detection.models.fpn import RetinaFPN, RetinaFPN_TransConv, YolofDC5FPN
 from public.detection.models.head import FCOSClsRegCntHead
 from public.detection.models.anchor import FCOSPositions
 
@@ -44,7 +44,8 @@ model_urls = {
 
 # assert input annotations are[x_min,y_min,x_max,y_max]
 class FCOS(nn.Module):
-    def __init__(self, resnet_type, num_classes=80, use_TransConv=False, use_gn=False, fpn_bn=False, planes=256):
+    def __init__(self, resnet_type, num_classes=80, use_TransConv=False, use_YolofDC5=False, use_gn=False, fpn_bn=False, freeze=False, 
+                 strides=[8, 16, 32, 64, 128], scales=[1., 1., 1., 1., 1.], planes=256):
         super(FCOS, self).__init__()
         self.backbone = ResNetBackbone(resnet_type=resnet_type)
         expand_ratio = {
@@ -58,6 +59,9 @@ class FCOS(nn.Module):
             128 * expand_ratio[resnet_type]), int(
                 256 * expand_ratio[resnet_type]), int(
                     512 * expand_ratio[resnet_type])
+        self.planes = planes
+        self.freeze = freeze
+
         if use_TransConv:
             self.fpn = RetinaFPN_TransConv(C3_inplanes,
                                 C4_inplanes,
@@ -65,6 +69,10 @@ class FCOS(nn.Module):
                                 planes,
                                 use_p5=True,
                                 fpn_bn=fpn_bn)
+        elif use_YolofDC5:
+            self.fpn = YolofDC5FPN(C5_inplanes=C5_inplanes)
+            self.planes = 512
+
         else:
             self.fpn = RetinaFPN(C3_inplanes,
                                 C4_inplanes,
@@ -74,7 +82,6 @@ class FCOS(nn.Module):
                                 fpn_bn=fpn_bn)
 
         self.num_classes = num_classes
-        self.planes = planes
 
         self.clsregcnt_head = FCOSClsRegCntHead(self.planes,
                                                 self.num_classes,
@@ -83,11 +90,13 @@ class FCOS(nn.Module):
                                                 use_gn=use_gn,
                                                 cnt_on_reg=True)
 
-        self.strides = torch.tensor([8, 16, 32, 64, 128], dtype=torch.float)
+        self.strides = torch.tensor(strides, dtype=torch.float)
         self.positions = FCOSPositions(self.strides)
 
         self.scales = nn.Parameter(
-            torch.tensor([1., 1., 1., 1., 1.], dtype=torch.float32))
+            torch.tensor(scales, dtype=torch.float32))
+
+
 
     def forward(self, inputs):
         self.batch_size, _, _, _ = inputs.shape
@@ -172,7 +181,7 @@ def resnet152_fcos(pretrained=False, **kwargs):
 
 
 if __name__ == '__main__':
-    net = FCOS(resnet_type="resnet50")
+    net = FCOS(resnet_type="resnet50", use_YolofDC5=True)
     image_h, image_w = 600, 600
     cls_heads, reg_heads, center_heads, batch_positions = net(
         torch.autograd.Variable(torch.randn(3, 3, image_h, image_w)))

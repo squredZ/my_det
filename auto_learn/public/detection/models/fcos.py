@@ -44,7 +44,8 @@ model_urls = {
 
 # assert input annotations are[x_min,y_min,x_max,y_max]
 class FCOS(nn.Module):
-    def __init__(self, resnet_type, num_classes=80, use_TransConv=False, use_YolofDC5=False, use_gn=False, fpn_bn=False, freeze=False, planes=256):
+    def __init__(self, resnet_type, num_classes=80, use_TransConv=False, use_YolofDC5=False, use_gn=False, fpn_bn=False, freeze=False, 
+                 strides=[8, 16, 32, 64, 128], scales=[1., 1., 1., 1., 1.], planes=256):
         super(FCOS, self).__init__()
         self.backbone = ResNetBackbone(resnet_type=resnet_type)
         expand_ratio = {
@@ -89,24 +90,12 @@ class FCOS(nn.Module):
                                                 use_gn=use_gn,
                                                 cnt_on_reg=True)
 
-        self.strides = torch.tensor([8, 16, 32, 64, 128], dtype=torch.float)
+        self.strides = torch.tensor(strides, dtype=torch.float)
         self.positions = FCOSPositions(self.strides)
 
         self.scales = nn.Parameter(
-            torch.tensor([1., 1., 1., 1., 1.], dtype=torch.float32))
+            torch.tensor(scales, dtype=torch.float32))
 
-
-    def train(self,mode=True):
-        '''
-        set module training mode, and frozen bn
-        '''
-        super().train(mode=True)
-        if self.freeze:
-            for p in self.backbone.parameters():
-                p.requires_grad = False
-            for p in self.fpn.parameters():
-                p.requires_grad = False
-            print("freeze backbone and fpn")
 
 
     def forward(self, inputs):

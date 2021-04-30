@@ -120,8 +120,8 @@ class DilatedEncoder(nn.Module):
         self.dilated_encoder_blocks = nn.Sequential(*encoder_blocks)
 
     def _init_weight(self):
-#         c2_xavier_fill(self.lateral_conv)
-#         c2_xavier_fill(self.fpn_conv)
+        c2_xavier_fill(self.lateral_conv)
+        c2_xavier_fill(self.fpn_conv)
         for m in [self.lateral_norm, self.fpn_norm]:
             nn.init.constant_(m.weight, 1)
             nn.init.constant_(m.bias, 0)

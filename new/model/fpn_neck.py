@@ -170,7 +170,6 @@ class YolofDC5FPN(nn.Module):
 
         self.trans = nn.ConvTranspose2d(in_channels=C5_inplanes, out_channels=int(C5_inplanes/2), kernel_size=4, stride=2, padding=1, bias=False)
         self.c4_out = nn.Conv2d(C5_inplanes, C5_inplanes, 1)
-        self.bn = nn.BatchNorm2d(C5_inplanes)
 
     def forward(self, inputs):
         _, C4, C5 = inputs
@@ -178,7 +177,7 @@ class YolofDC5FPN(nn.Module):
         del inputs
         
         C5_up = self.trans(C5).contiguous()
-        C5 = self.bn(self.c4_out(torch.cat((C4, C5_up), 1)))
+        C5 = self.c4_out(torch.cat((C4, C5_up), 1))
         
         features = self.dila_encoder(C5)
 

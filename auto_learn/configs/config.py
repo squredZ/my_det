@@ -23,8 +23,8 @@ class Config(object):
     val_dataset_path = os.path.join(base_path, 'images/xtrzk')
     dataset_annotations_path = os.path.join(base_path, 'annotations/v1')
 
-    network = "resnet50_fcos"
-    pretrained = False
+    network = "resnet50_yolof"
+    pretrained = True
     num_classes = 1
     seed = 0
     input_image_size = 667
@@ -51,12 +51,14 @@ class Config(object):
     use_TransConv = False
     use_YolofDC5 = True
     freeze = True
+    strides = [16]
+    scales = [1.0]
 
 
-    epochs = 12
-    per_node_batch_size = 12
-    lr = 1e-5
+    epochs = 48
+    per_node_batch_size = 2
+    lr = 1e-2
     num_workers = 4
-    print_interval = 100
+    print_interval = 1
     apex = True
     sync_bn = False

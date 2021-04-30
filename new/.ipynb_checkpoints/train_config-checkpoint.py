@@ -35,7 +35,7 @@ class Config(object):
                                       RandomFlip(flip_prob=0.5),
                                       RandomCrop(crop_prob=0.5),
                                       RandomTranslate(translate_prob=0.5),
-                                      Normalize(),
+                                      Normalize(mean=[0.40789654, 0.44719302, 0.47026115],std=[0.28863828, 0.27408164, 0.27809835]),
                                       Resize(resize=input_image_size)
                                   ]))
     val_dataset = CocoDetection(image_root_dir=val_dataset_path,
