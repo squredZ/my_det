@@ -285,6 +285,8 @@ def main():
             continue
         keys.append(k)
     model.load_state_dict({k:new_dict[k] for k in keys}, strict = False)
+
+    model.scales.requires_grad = False
     
     for p in model.backbone.parameters():
         p.requires_grad = False
