@@ -285,6 +285,9 @@ def main():
             continue
         keys.append(k)
     model.load_state_dict({k:new_dict[k] for k in keys}, strict = False)
+#     model.load_state_dict(pre_model, strict=False)
+    
+    model.scales.requires_grad = False
     
     for p in model.backbone.parameters():
         p.requires_grad = False
@@ -461,14 +464,14 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, args):
             print("zero")
             continue
 #*********************************************************************************************************
-#         if args.apex:
-#             with amp.scale_loss(loss, optimizer) as scaled_loss:
-#                 scaled_loss.backward()
-#         else:
-#             loss.backward()
-        loss.backward()
+        if args.apex:
+            with amp.scale_loss(loss, optimizer) as scaled_loss:
+                scaled_loss.backward()
+        else:
+            loss.backward()
+#         loss.backward()
 
-#         torch.nn.utils.clip_grad_norm_(model.parameters(), 0.1)
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 0.1)
         optimizer.step()
         optimizer.zero_grad()
 

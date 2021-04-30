@@ -21,7 +21,7 @@ class Config(object):
     base_path = '/home/jovyan/data-vol-polefs-1/small_sample/dataset'
     train_dataset_path = os.path.join(base_path, 'images/xtrzk')
     val_dataset_path = os.path.join(base_path, 'images/xtrzk')
-    dataset_annotations_path = os.path.join(base_path, 'annotations/v1')
+    dataset_annotations_path = os.path.join(base_path, 'annotations/v2')
 
     network = "resnet50_yolof"
     pretrained = True
@@ -57,7 +57,7 @@ class Config(object):
 
     epochs = 48
     per_node_batch_size = 2
-    lr = 1e-2
+    lr = 1e-4
     num_workers = 4
     print_interval = 1
     apex = True
