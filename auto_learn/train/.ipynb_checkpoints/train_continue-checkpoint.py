@@ -264,7 +264,7 @@ def main():
     })
 
     
-    pre_model = torch.load('/home/jovyan/data-vol-polefs-1/yolof_dc5_res50_coco667_withImPre/best.pth', map_location='cpu')
+    pre_model = torch.load('/home/jovyan/data-vol-polefs-1/small_sample/checkpoints/v1/best.pth', map_location='cpu')
     
     def copyStateDict(state_dict):
         if list(state_dict.keys())[0].startswith('module'):
@@ -283,13 +283,12 @@ def main():
     for k,v in new_dict.items():
         if k.startswith('clsregcnt_head.cls_out'):    #将‘clsregcnt_head’开头的key过滤掉，这里是要去除的层的key
             continue
-#         if k.startswith('clsregcnt_head.reg_out'):
-#             continue
-#         if k.startswith('clsregcnt_head.center_out'):
-#             continue
+        if k.startswith('clsregcnt_head.reg_out'):
+            continue
+        if k.startswith('clsregcnt_head.center_out'):
+            continue
         keys.append(k)
     model.load_state_dict({k:new_dict[k] for k in keys}, strict = False)
-#     model.load_state_dict(pre_model, strict=False)
     
     model.scales.requires_grad = False
     

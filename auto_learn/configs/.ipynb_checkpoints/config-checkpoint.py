@@ -21,10 +21,10 @@ class Config(object):
     base_path = '/home/jovyan/data-vol-polefs-1/small_sample/dataset'
     train_dataset_path = os.path.join(base_path, 'images/xtrzk')
     val_dataset_path = os.path.join(base_path, 'images/xtrzk')
-    dataset_annotations_path = os.path.join(base_path, 'annotations/v2')
+    dataset_annotations_path = os.path.join(base_path, 'annotations/current')
 
     network = "resnet50_yolof"
-    pretrained = True
+    pretrained = False
     num_classes = 1
     seed = 0
     input_image_size = 667

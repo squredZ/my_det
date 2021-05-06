@@ -10,11 +10,11 @@ from public.detection.models import yolof2
 from public.detection.models.decode import FCOSDecoder
 from tqdm import tqdm
 
-use_gpu = False
-model_dir = "C:\\Users\\zhangze\\Desktop\\git\\best.pth"
-im_dir = "C:\\Users\\zhangze\\AppData\\Roaming\\CCwork\\7652669648891056\\FileRecv\\xtrzk\\"
-old_train_dir = "C:\\Users\\zhangze\\Desktop\\git\\my_det\\auto_learn\\instances_train.json"
-wait_dir = "C:\\Users\\zhangze\\Desktop\\git\\my_det\\auto_learn\\instances_wait.json"
+use_gpu = True
+model_dir = "/home/jovyan/data-vol-polefs-1/small_sample/checkpoints/v1/best.pth"
+im_dir = "/home/jovyan/data-vol-polefs-1/small_sample/dataset/images/xtrzk/"
+old_train_dir = "/home/jovyan/data-vol-polefs-1/small_sample/dataset/annotations/current/instances_train.json"
+wait_dir = "/home/jovyan/data-vol-polefs-1/small_sample/dataset/annotations/instances_wait.json"
 
 #加载模型
 model = yolof2.resnet50_yolof(num_classes=1)
@@ -46,7 +46,6 @@ with torch.no_grad():
         current_dir = os.path.join(im_dir, item[0])
         img = cv2.imdecode(np.fromfile(current_dir, dtype=np.uint8), -1)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.
-        img = img.to(device)
         height, width, _ = img.shape
         max_image_size = max(height, width)
         resize_factor = resize / max_image_size
@@ -56,6 +55,7 @@ with torch.no_grad():
         resized_img = np.zeros((resize, resize, 3))
         resized_img[0:resize_height, 0:resize_width] = img
         resized_img = torch.tensor(resized_img).permute(2, 0, 1).float().unsqueeze(0)
+        resized_img = resized_img.to(device)
         cls_heads, reg_heads, center_heads, batch_positions = model(resized_img)
         scores, classes, boxes = decoder(cls_heads, reg_heads, center_heads, batch_positions)
         scores, classes, boxes = scores.cpu(), classes.cpu(), boxes.cpu()
@@ -74,5 +74,5 @@ with open(old_train_dir, "r") as f:
 new_train = deepcopy(old_train)
 new_train["images"] = new_train["images"] + wait_coco.loadImgs(ids=im_ids)
 new_train["annotations"] = new_train["annotations"] + wait_coco.loadAnns(wait_coco.getAnnIds(imgIds=im_ids))
-json.dump(new_train, "new_train.json")
-
+json.dump(new_train, open("/home/jovyan/data-vol-polefs-1/small_sample/dataset/annotations/current/instances_train.json", 'w'))
+json.dump(new_train, open("/home/jovyan/data-vol-polefs-1/small_sample/dataset/annotations/instances_train_v2.json", 'w'))
