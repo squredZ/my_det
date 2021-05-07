@@ -444,7 +444,8 @@ def main():
         logger.info(
             f"finish training, total training time: {training_time:.2f} hours")
     
-    os.system("python ../find_new.py --version {}".format(args.version + 1))
+    if local_rank == 0:
+        os.system("python ../find_new.py {}".format(args.version + 1))
 
 
 def train(train_loader, model, criterion, optimizer, scheduler, epoch, args):

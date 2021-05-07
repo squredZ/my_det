@@ -12,10 +12,10 @@ from tqdm import tqdm
 import random
 import sys
 
-version = sys.argv[1]
+version = int(sys.argv[1])
 use_gpu = True
-model_dir = "/home/jovyan/data-vol-polefs-1/small_sample/checkpoints/v{}/best.pth".format(str(version-1))
-im_dir = "/home/jovyan/data-vol-polefs-1/small_sample/dataset/images/xtrzk/"
+model_dir = "/home/jovyan/data-vol-polefs-1/small_sample/checkpoints/v{}/best.pth".format(version-1)
+im_dir = "/home/jovyan/data-vol-polefs-1/small_sample/dataset/images/images/"
 old_train_dir = "/home/jovyan/data-vol-polefs-1/small_sample/dataset/annotations/current/instances_train.json"
 wait_dir = "/home/jovyan/data-vol-polefs-1/small_sample/dataset/annotations/instances_wait.json"
 
@@ -75,24 +75,24 @@ with torch.no_grad():
         im_scores[item[1]] = entropy
 
 im_list.sort(key=lambda x:im_scores[x[1]],reverse=True)
-random.shuffle(im_list)
-im_ids = [item[1] for item in im_list[:50]]
-# im_ids = []
+# random.shuffle(im_list)
+# im_ids = [item[1] for item in im_list[:50]]
+im_ids = []
 
-# count = 0
-# idx = 0
-# while count < 10:
-#     item = im_list[idx]
-#     if item[0] in old_file:
-#         continue
-#     else:
-#         im_ids.append(item[1])
-#         count += 1
-#     idx += 1
+count = 0
+idx = 0
+while count < 10:
+    item = im_list[idx]
+    if item[0] in old_file:
+        continue
+    else:
+        im_ids.append(item[1])
+        count += 1
+    idx += 1
 
 
 
 new_train["images"] = new_train["images"] + wait_coco.loadImgs(ids=im_ids)
 new_train["annotations"] = new_train["annotations"] + wait_coco.loadAnns(wait_coco.getAnnIds(imgIds=im_ids))
 json.dump(new_train, open("/home/jovyan/data-vol-polefs-1/small_sample/dataset/annotations/current/instances_train.json", 'w'))
-json.dump(new_train, open("/home/jovyan/data-vol-polefs-1/small_sample/dataset/annotations/instances_train_v{}.json".format(str(version)), 'w'))
+json.dump(new_train, open("/home/jovyan/data-vol-polefs-1/small_sample/dataset/annotations/instances_train_v{}.json".format(version), 'w'))
