@@ -11,6 +11,7 @@ from public.detection.models.decode import FCOSDecoder
 from tqdm import tqdm
 import random
 import sys
+import time
 
 version = int(sys.argv[1])
 use_gpu = True
@@ -46,9 +47,10 @@ im_scores = {}
 
 device = torch.device("cpu")
 if use_gpu:
-    decoder = decoder.cuda()
-    model = model.cuda()
     device = torch.device("cuda:0")
+    decoder = decoder.to(device)
+    model = model.to(device)
+    
 
 with torch.no_grad():
     for item in tqdm(im_list):
@@ -68,20 +70,31 @@ with torch.no_grad():
         cls_heads, reg_heads, center_heads, batch_positions = model(resized_img)
         scores, classes, boxes = decoder(cls_heads, reg_heads, center_heads, batch_positions)
         scores, classes, boxes = scores.cpu(), classes.cpu(), boxes.cpu()
-        score = scores[0][0].item()
+        score = scores[0].mean().item()
+
         if score > 0.9 or score < 0.1:
             continue
         entropy = -(score*np.log(score) + (1-score)*np.log(1-score))
         im_scores[item[1]] = entropy
 
-im_list.sort(key=lambda x:im_scores[x[1]],reverse=True)
+        
+        
+def sort_score(x):
+    try:
+        out = im_scores[x[1]]
+    except:
+        out = -9999
+    return out
+# im_list.sort(key=lambda x:im_scores[x[1]],reverse=True)
+im_list.sort(key=sort_score, reverse=True)
+
 # random.shuffle(im_list)
-# im_ids = [item[1] for item in im_list[:50]]
+# im_ids = [item[1] for item in im_list[:30]]
 im_ids = []
 
 count = 0
 idx = 0
-while count < 10:
+while count < 50:
     item = im_list[idx]
     idx += 1
     if item[0] in old_file:
@@ -95,5 +108,8 @@ while count < 10:
 
 new_train["images"] = new_train["images"] + wait_coco.loadImgs(ids=im_ids)
 new_train["annotations"] = new_train["annotations"] + wait_coco.loadAnns(wait_coco.getAnnIds(imgIds=im_ids))
+# new_train["images"] = wait_coco.loadImgs(ids=im_ids)
+# new_train["annotations"] = wait_coco.loadAnns(wait_coco.getAnnIds(imgIds=im_ids))
+
 json.dump(new_train, open("/home/jovyan/data-vol-polefs-1/small_sample/dataset/annotations/current/instances_train.json", 'w'))
 json.dump(new_train, open("/home/jovyan/data-vol-polefs-1/small_sample/dataset/annotations/instances_train_v{}.json".format(version), 'w'))

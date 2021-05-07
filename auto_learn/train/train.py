@@ -270,8 +270,12 @@ def main():
     
     if args.version == 1:
         pre_model = torch.load('/home/jovyan/data-vol-polefs-1/yolof_dc5_res50_coco667_withImPre/best.pth', map_location='cpu')
+        if local_rank == 0:
+            logger.info(f"pretrained_model: {'/home/jovyan/data-vol-polefs-1/yolof_dc5_res50_coco667_withImPre/best.pth'}")
     else:
         pre_model = torch.load('/home/jovyan/data-vol-polefs-1/small_sample/checkpoints/v{}/best.pth'.format(args.version-1), map_location='cpu')
+        if local_rank == 0:
+            logger.info(f"pretrained_model: {'/home/jovyan/data-vol-polefs-1/small_sample/checkpoints/v{}/best.pth'.format(args.version-1)}")
     
     def copyStateDict(state_dict):
         if list(state_dict.keys())[0].startswith('module'):
@@ -409,7 +413,7 @@ def main():
                 f"train: epoch {epoch:0>3d}, cls_loss: {cls_losses:.2f}, reg_loss: {reg_losses:.2f}, center_ness_loss: {center_ness_losses:.2f}, loss: {losses:.2f}"
             )
 
-        if epoch % 12 == 0 or epoch % 24 == 0 or epoch == args.epochs:
+        if epoch % 6 == 0 or epoch % 24 == 0 or epoch == args.epochs:
             if local_rank == 0:
                 logger.info(f"start eval.")
                 all_eval_result = validate(Config.val_dataset, model, decoder,
@@ -444,7 +448,11 @@ def main():
         logger.info(
             f"finish training, total training time: {training_time:.2f} hours")
     
+    
     if local_rank == 0:
+        print("wait to start find difficult samples!")
+        time.sleep(3)
+        print("start finding difficult samples!")
         os.system("python ../find_new.py {}".format(args.version + 1))
 
 
@@ -453,14 +461,6 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, args):
 
     # switch to train mode
     model.train()
-#     for p in model.module.backbone.parameters():
-#         p.requires_grad = False
-#     for p in model.module.dila_encoder.parameters():
-#             p.requires_grad = False
-#     for p in model.module.trans.parameters():
-#             p.requires_grad = False
-#     for p in model.module.c4_out.parameters():
-#             p.requires_grad = False
 
     iters = len(train_loader.dataset) // (args.per_node_batch_size * gpus_num)
     prefetcher = COCODataPrefetcher(train_loader)
