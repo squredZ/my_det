@@ -83,12 +83,13 @@ count = 0
 idx = 0
 while count < 10:
     item = im_list[idx]
+    idx += 1
     if item[0] in old_file:
         continue
     else:
         im_ids.append(item[1])
         count += 1
-    idx += 1
+    
 
 
 
