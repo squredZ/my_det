@@ -283,10 +283,10 @@ def main():
     for k,v in new_dict.items():
         if k.startswith('clsregcnt_head.cls_out'):    #将‘clsregcnt_head’开头的key过滤掉，这里是要去除的层的key
             continue
-#         if k.startswith('clsregcnt_head.reg_out'):
-#             continue
-#         if k.startswith('clsregcnt_head.center_out'):
-#             continue
+        if k.startswith('clsregcnt_head.reg_out'):
+            continue
+        if k.startswith('clsregcnt_head.center_out'):
+            continue
         keys.append(k)
     model.load_state_dict({k:new_dict[k] for k in keys}, strict = False)
 #     model.load_state_dict(pre_model, strict=False)
