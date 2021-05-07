@@ -14,13 +14,18 @@ import torchvision.datasets as datasets
 
 
 class Config(object):
-    log = './log_1'  # Path to save log
-    checkpoint_path = '/home/jovyan/data-vol-polefs-1/small_sample/checkpoints/v6'  # Path to store checkpoint model
-    resume = '/home/jovyan/data-vol-polefs-1/small_sample/checkpoints/v6/latest.pth'  # load checkpoint model
+    #**********************************************
+    #输入verison
+    version = 1
+    #**********************************************
+    
+    log = './log_' + str(version)  # Path to save log
+    checkpoint_path = '/home/jovyan/data-vol-polefs-1/small_sample/checkpoints/v{}'.format(version)  # Path to store checkpoint model
+    resume = '/home/jovyan/data-vol-polefs-1/small_sample/checkpoints/v{}/latest.pth'.format(version)  # load checkpoint model
     evaluate = None  # evaluate model path
     base_path = '/home/jovyan/data-vol-polefs-1/small_sample/dataset'
-    train_dataset_path = os.path.join(base_path, 'images/xtrzk')
-    val_dataset_path = os.path.join(base_path, 'images/xtrzk')
+    train_dataset_path = os.path.join(base_path, 'images/images')
+    val_dataset_path = os.path.join(base_path, 'images/images')
     dataset_annotations_path = os.path.join(base_path, 'annotations/current')
 
     network = "resnet50_yolof"

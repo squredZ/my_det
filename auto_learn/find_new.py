@@ -10,9 +10,11 @@ from public.detection.models import yolof2
 from public.detection.models.decode import FCOSDecoder
 from tqdm import tqdm
 import random
+import sys
 
+version = sys.argv[1]
 use_gpu = True
-model_dir = "/home/jovyan/data-vol-polefs-1/small_sample/checkpoints/v4/best.pth"
+model_dir = "/home/jovyan/data-vol-polefs-1/small_sample/checkpoints/v{}/best.pth".format(str(version-1))
 im_dir = "/home/jovyan/data-vol-polefs-1/small_sample/dataset/images/xtrzk/"
 old_train_dir = "/home/jovyan/data-vol-polefs-1/small_sample/dataset/annotations/current/instances_train.json"
 wait_dir = "/home/jovyan/data-vol-polefs-1/small_sample/dataset/annotations/instances_wait.json"
@@ -93,4 +95,4 @@ im_ids = [item[1] for item in im_list[:50]]
 new_train["images"] = new_train["images"] + wait_coco.loadImgs(ids=im_ids)
 new_train["annotations"] = new_train["annotations"] + wait_coco.loadAnns(wait_coco.getAnnIds(imgIds=im_ids))
 json.dump(new_train, open("/home/jovyan/data-vol-polefs-1/small_sample/dataset/annotations/current/instances_train.json", 'w'))
-json.dump(new_train, open("/home/jovyan/data-vol-polefs-1/small_sample/dataset/annotations/instances_train_v6.json", 'w'))
+json.dump(new_train, open("/home/jovyan/data-vol-polefs-1/small_sample/dataset/annotations/instances_train_v{}.json".format(str(version)), 'w'))

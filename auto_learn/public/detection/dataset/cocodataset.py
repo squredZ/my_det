@@ -210,9 +210,14 @@ class CocoDetection(Dataset):
         return annotations
 
     def find_coco_label_from_category_id(self, category_id):
-        return self.category_id_to_coco_label[category_id]
+        try:
+            return self.category_id_to_coco_label[category_id]
+        except:
+            print(" asdfa ", category_id, "   ", self.coco_label_to_category_id)
+            raise ValueError("asdf")
 
     def find_category_id_from_coco_label(self, coco_label):
+        
         return self.coco_label_to_category_id[coco_label]
 
     def num_classes(self):

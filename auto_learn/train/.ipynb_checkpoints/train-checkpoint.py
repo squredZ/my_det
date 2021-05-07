@@ -6,14 +6,13 @@ import shutil
 import time
 import warnings
 import json
+from collections import OrderedDict
 
 BASE_DIR = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(BASE_DIR)
-warnings.filterwarnings('ignore')
-
 sys.path.append("../")
-
+warnings.filterwarnings('ignore')
 
 import numpy as np
 from thop import profile
@@ -34,7 +33,7 @@ from configs.config import Config
 from public.detection.dataset.cocodataset import COCODataPrefetcher, Collater
 from public.detection.models.loss import FCOSLoss
 from public.detection.models.decode import FCOSDecoder
-from public.detection.models import fcos
+from public.detection.models import yolof2 as yolof
 from public.imagenet.utils import get_logger
 from pycocotools.cocoeval import COCOeval
 
@@ -107,41 +106,23 @@ def parse_args():
                         type=int,
                         default=0,
                         help='LOCAL_PROCESS_RANK')
-    parser.add_argument('--use_TransConv',
-                        type=bool,
-                        default=Config.use_TransConv,
-                        help='LOCAL_PROCESS_RANK')
+
     parser.add_argument('--use_gn',
                         type=bool,
                         default=Config.use_gn,
                         help='LOCAL_PROCESS_RANK')
-    parser.add_argument('--fpn_bn',
-                        type=bool,
-                        default=Config.fpn_bn,
-                        help='LOCAL_PROCESS_RANK')
-    parser.add_argument("--use_YolofDC5",
-                        type=bool,
-                        default=Config.use_YolofDC5,
-                        help="use yolofdc5 head")
-    parser.add_argument("--freeze",
-                        type=bool,
-                        default=Config.freeze,
-                        help="if freeze backbone and fpn")
-    parser.add_argument("--strides",
-                        type=list,
-                        default=Config.strides,
-                        help="down strides")
-    parser.add_argument("--scales",
-                        type=list,
-                        default=Config.scales,
-                        help="scales param")
-    
+    parser.add_argument('--version',
+                        type=int,
+                        default=Config.version,
+                        help='current version')
+
 
     return parser.parse_args()
 
 
 def validate(val_dataset, model, decoder, args):
-#     model = model.module
+    if args.apex:
+        model = model.module
     # switch to evaluate mode
     model.eval()
     with torch.no_grad():
@@ -254,6 +235,7 @@ def main():
 
     torch.cuda.set_device(local_rank)
     dist.init_process_group(backend='nccl', init_method='env://')
+
     global gpus_num
     gpus_num = torch.cuda.device_count()
     if local_rank == 0:
@@ -279,20 +261,54 @@ def main():
     if local_rank == 0:
         logger.info('finish loading data')
 
-    model = fcos.__dict__[args.network](**{
+    model = yolof.__dict__[args.network](**{
         "pretrained": args.pretrained,
         "num_classes": args.num_classes,
-        "use_TransConv": args.use_TransConv,
-        "use_YolofDC5": args.use_YolofDC5,
         "use_gn": args.use_gn,
-        "fpn_bn": args.fpn_bn,
-        "freeze": args.freeze,
-        "strides": args.strides,
-        "scales": args.scales
     })
 
-    model_l = torch.load("/home/jovyan/data-vol-polefs-1/yolof_dc5_res50_coco667_withImPre/best.pth", map_location="cpu")
-    model.load_state_dict(model_l, strict=False)
+    
+    if args.version == 1:
+        pre_model = torch.load('/home/jovyan/data-vol-polefs-1/yolof_dc5_res50_coco667_withImPre/best.pth', map_location='cpu')
+    else:
+        pre_model = torch.load('/home/jovyan/data-vol-polefs-1/small_sample/checkpoints/v{}/best.pth'.format(args.version-1), map_location='cpu')
+    
+    def copyStateDict(state_dict):
+        if list(state_dict.keys())[0].startswith('module'):
+            start_idx = 1
+        else:
+            start_idx = 0
+        new_state_dict = OrderedDict()
+        for k,v in state_dict.items():
+            name = '.'.join(k.split('.')[start_idx:])
+
+            new_state_dict[name] = v
+        return new_state_dict
+    new_dict=copyStateDict(pre_model)
+
+    keys=[]
+    for k,v in new_dict.items():
+        if k.startswith('clsregcnt_head.cls_out'):    #将‘clsregcnt_head’开头的key过滤掉，这里是要去除的层的key
+            continue
+        if args.version != 1:
+            if k.startswith('clsregcnt_head.reg_out'):
+                continue
+            if k.startswith('clsregcnt_head.center_out'):
+                continue
+        keys.append(k)
+    model.load_state_dict({k:new_dict[k] for k in keys}, strict = False)
+#     model.load_state_dict(pre_model, strict=False)
+    
+    model.scales.requires_grad = False
+    
+    for p in model.backbone.parameters():
+        p.requires_grad = False
+    for p in model.dila_encoder.parameters():
+            p.requires_grad = False
+    for p in model.trans.parameters():
+            p.requires_grad = False
+    for p in model.c4_out.parameters():
+            p.requires_grad = False
     
     for name, param in model.named_parameters():
         if local_rank == 0:
@@ -307,28 +323,28 @@ def main():
             f"model: '{args.network}', flops: {flops}, params: {params}")
 
     criterion = FCOSLoss(strides=[16],
-                 mi=[[0,9999]]).cuda()
+                 mi=[[0, 512]]).cuda()
     decoder = FCOSDecoder(image_w=args.input_image_size,
-                          image_h=args.input_image_size,
-                         strides=[16]).cuda()
+                          image_h=args.input_image_size, strides=[16]).cuda()
 
     model = model.cuda()
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,
                                                            patience=3,
                                                            verbose=True)
+#     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max=4, eta_min=1e-6, last_epoch=-1)
 
     if args.sync_bn:
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
-#***********************************************************************************************************************
-#     if args.apex:
-#         amp.register_float_function(torch, 'sigmoid')
-#         amp.register_float_function(torch, 'softmax')
-#         model, optimizer = amp.initialize(model, optimizer, opt_level='O1')
-#         model = apex.parallel.DistributedDataParallel(model,
-#                                                       delay_allreduce=True)
-#         if args.sync_bn:
-#             model = apex.parallel.convert_syncbn_model(model)
+
+    if args.apex:
+        amp.register_float_function(torch, 'sigmoid')
+        amp.register_float_function(torch, 'softmax')
+        model, optimizer = amp.initialize(model, optimizer, opt_level='O1')
+        model = apex.parallel.DistributedDataParallel(model,
+                                                      delay_allreduce=True)
+        if args.sync_bn:
+            model = apex.parallel.convert_syncbn_model(model)
 #     else:
 #         model = nn.parallel.DistributedDataParallel(model,
 #                                                     device_ids=[local_rank],
@@ -393,7 +409,7 @@ def main():
                 f"train: epoch {epoch:0>3d}, cls_loss: {cls_losses:.2f}, reg_loss: {reg_losses:.2f}, center_ness_loss: {center_ness_losses:.2f}, loss: {losses:.2f}"
             )
 
-        if epoch % 2 == 0 or epoch % 12 == 0 or epoch == args.epochs:
+        if epoch % 12 == 0 or epoch % 24 == 0 or epoch == args.epochs:
             if local_rank == 0:
                 logger.info(f"start eval.")
                 all_eval_result = validate(Config.val_dataset, model, decoder,
@@ -427,6 +443,8 @@ def main():
     if local_rank == 0:
         logger.info(
             f"finish training, total training time: {training_time:.2f} hours")
+    
+    os.system("python ../find_new.py --version {}".format(args.version + 1))
 
 
 def train(train_loader, model, criterion, optimizer, scheduler, epoch, args):
@@ -434,11 +452,14 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, args):
 
     # switch to train mode
     model.train()
-    if args.freeze:
-        for p in model.backbone.parameters():
-            p.requires_grad = False
-        for p in model.fpn.parameters():
-            p.requires_grad = False
+#     for p in model.module.backbone.parameters():
+#         p.requires_grad = False
+#     for p in model.module.dila_encoder.parameters():
+#             p.requires_grad = False
+#     for p in model.module.trans.parameters():
+#             p.requires_grad = False
+#     for p in model.module.c4_out.parameters():
+#             p.requires_grad = False
 
     iters = len(train_loader.dataset) // (args.per_node_batch_size * gpus_num)
     prefetcher = COCODataPrefetcher(train_loader)
@@ -450,16 +471,19 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, args):
         cls_heads, reg_heads, center_heads, batch_positions = model(images)
         cls_loss, reg_loss, center_ness_loss = criterion(
             cls_heads, reg_heads, center_heads, batch_positions, annotations)
+
         loss = cls_loss + reg_loss + center_ness_loss
         if cls_loss == 0.0 or reg_loss == 0.0:
             optimizer.zero_grad()
+            print("zero")
             continue
-
+#*********************************************************************************************************
         if args.apex:
             with amp.scale_loss(loss, optimizer) as scaled_loss:
                 scaled_loss.backward()
         else:
             loss.backward()
+#         loss.backward()
 
         torch.nn.utils.clip_grad_norm_(model.parameters(), 0.1)
         optimizer.step()
@@ -469,6 +493,7 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, args):
         reg_losses.append(reg_loss.item())
         center_ness_losses.append(center_ness_loss.item())
         losses.append(loss.item())
+        
 
         images, annotations = prefetcher.next()
 
@@ -479,7 +504,7 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, args):
 
         iter_index += 1
 
-    scheduler.step(np.mean(losses))
+#     scheduler.step(np.mean(losses))
 
     return np.mean(cls_losses), np.mean(reg_losses), np.mean(
         center_ness_losses), np.mean(losses)
@@ -487,3 +512,4 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, args):
 
 if __name__ == '__main__':
     main()
+   
