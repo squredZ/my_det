@@ -12,14 +12,13 @@ from public.detection.dataset.cocodataset import CocoDetection, Resize, RandomFl
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 
-
 class Config(object):
     #**********************************************
     #输入verison
     version = 1
     #**********************************************
     
-    log = './log_' + str(version)  # Path to save log
+    log = './log_lr_' + str(version)  # Path to save log
     checkpoint_path = '/home/jovyan/data-vol-polefs-1/small_sample/checkpoints/v{}'.format(version)  # Path to store checkpoint model
     resume = '/home/jovyan/data-vol-polefs-1/small_sample/checkpoints/v{}/latest.pth'.format(version)  # load checkpoint model
     evaluate = None  # evaluate model path

@@ -505,7 +505,7 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, args):
 
         iter_index += 1
 
-    scheduler.step(np.mean(losses)
+    scheduler.step(np.mean(losses))
 
     return np.mean(cls_losses), np.mean(reg_losses), np.mean(
         center_ness_losses), np.mean(losses)
