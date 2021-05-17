@@ -19,16 +19,16 @@ class Config(object):
         #**********************************************
         self.version = ver
         #**********************************************
-        self.name = "monkey" #training name, to save log and check_points, set as your willing
+        self.name = "no_freeze_200" #training name, to save log and check_points, set as your willing
         self.log = './log_' + self.name + '/log_' + str(self.version)  # Path to save log
         self.checkpoint_path = '/home/jovyan/data-vol-polefs-1/small_sample/checkpoints/{}/v{}'.format(self.name,self.version)  # Path to store checkpoint model
         self.resume = '/home/jovyan/data-vol-polefs-1/small_sample/checkpoints/{}/v{}/latest.pth'.format(self.name,self.version)  # load checkpoint model
         self.pre_model_dir = '/home/jovyan/data-vol-polefs-1/small_sample/checkpoints/{}/v{}'.format(self.name, self.version-1)
         self.evaluate = None  # evaluate model path
-        self.base_path = '/home/jovyan/data-vol-polefs-1/small_sample/dataset/monkey/input_monkey'
-        self.train_dataset_path = os.path.join(self.base_path, 'train2007')
-        self.val_dataset_path = os.path.join(self.base_path, 'val2007')
-        self.dataset_annotations_path = os.path.join(self.base_path, 'annotations')
+        self.base_path = '/home/jovyan/data-vol-polefs-1/small_sample/dataset'
+        self.train_dataset_path = os.path.join(self.base_path, 'images/images')
+        self.val_dataset_path = os.path.join(self.base_path, 'images/images')
+        self.dataset_annotations_path = os.path.join(self.base_path, 'annotations/'+self.name)
 
         self.network = "resnet50_yolof"
         #use the pretrained model
@@ -69,7 +69,7 @@ class Config(object):
         self.scales = [1.0]
 
 
-        self.epochs = 48
+        self.epochs = 16
         self.per_node_batch_size = 2
         self.lr = 1e-5
         self.num_workers = 4
