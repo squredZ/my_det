@@ -14,13 +14,24 @@ import sys
 import time
 
 version = int(sys.argv[1])
+save_dir = sys.argv[2]
+model_load_dir = sys.argv[3]
 use_gpu = True
-model_dir = "/home/jovyan/data-vol-polefs-1/small_sample/checkpoints/v{}/best.pth".format(version-1)
+
+#model path
+model_dir = model_load_dir + "/v{}/best.pth".format(version-1)
+
+#images to find
 im_dir = "/home/jovyan/data-vol-polefs-1/small_sample/dataset/images/images/"
-old_train_dir = "/home/jovyan/data-vol-polefs-1/small_sample/dataset/annotations/current/instances_train.json"
+
+#the old training annotation path
+old_train_dir = os.path.join(save_dir, "instances_train.json")
+#the sample pool
 wait_dir = "/home/jovyan/data-vol-polefs-1/small_sample/dataset/annotations/instances_wait.json"
 
-#加载模型
+#加载模型 
+torch.cuda.set_device(2)
+
 model = yolof2.resnet50_yolof(num_classes=1)
 pre_model = torch.load(model_dir, map_location="cpu")
 model.load_state_dict(pre_model, strict=False)
@@ -45,11 +56,9 @@ decoder = FCOSDecoder(image_w=resize, image_h=resize,strides=[16])
 im_scores = {}
 
 
-device = torch.device("cpu")
 if use_gpu:
-    device = torch.device("cuda:0")
-    decoder = decoder.to(device)
-    model = model.to(device)
+    decoder = decoder.cuda()
+    model = model.cuda()
     
 
 with torch.no_grad():
@@ -66,7 +75,7 @@ with torch.no_grad():
         resized_img = np.zeros((resize, resize, 3))
         resized_img[0:resize_height, 0:resize_width] = img
         resized_img = torch.tensor(resized_img).permute(2, 0, 1).float().unsqueeze(0)
-        resized_img = resized_img.to(device)
+        resized_img = resized_img.cuda()
         cls_heads, reg_heads, center_heads, batch_positions = model(resized_img)
         scores, classes, boxes = decoder(cls_heads, reg_heads, center_heads, batch_positions)
         scores, classes, boxes = scores.cpu(), classes.cpu(), boxes.cpu()
@@ -85,16 +94,14 @@ def sort_score(x):
     except:
         out = -9999
     return out
-# im_list.sort(key=lambda x:im_scores[x[1]],reverse=True)
 im_list.sort(key=sort_score, reverse=True)
-
 # random.shuffle(im_list)
-# im_ids = [item[1] for item in im_list[:30]]
+
 im_ids = []
 
 count = 0
 idx = 0
-while count < 50:
+while count < 200:
     item = im_list[idx]
     idx += 1
     if item[0] in old_file:
@@ -111,5 +118,5 @@ new_train["annotations"] = new_train["annotations"] + wait_coco.loadAnns(wait_co
 # new_train["images"] = wait_coco.loadImgs(ids=im_ids)
 # new_train["annotations"] = wait_coco.loadAnns(wait_coco.getAnnIds(imgIds=im_ids))
 
-json.dump(new_train, open("/home/jovyan/data-vol-polefs-1/small_sample/dataset/annotations/current/instances_train.json", 'w'))
-json.dump(new_train, open("/home/jovyan/data-vol-polefs-1/small_sample/dataset/annotations/instances_train_v{}.json".format(version), 'w'))
+json.dump(new_train, open(os.path.join(save_dir, "instances_train.json"), 'w'))
+json.dump(new_train, open(os.path.join(save_dir, "instances_train_v{}.json".format(version)), 'w'))

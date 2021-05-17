@@ -38,69 +38,76 @@ from public.imagenet.utils import get_logger
 from pycocotools.cocoeval import COCOeval
 
 
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description='PyTorch COCO Detection Distributed Training')
+    
+    config = Config(ver=int(sys.argv[2][-2:].lstrip("=")))
+    parser.add_argument('--version',
+                        type=int,
+                        default=config.version,
+                        help='current version')
     parser.add_argument('--network',
                         type=str,
-                        default=Config.network,
+                        default=config.network,
                         help='name of network')
     parser.add_argument('--lr',
                         type=float,
-                        default=Config.lr,
+                        default=config.lr,
                         help='learning rate')
     parser.add_argument('--epochs',
                         type=int,
-                        default=Config.epochs,
+                        default=config.epochs,
                         help='num of training epochs')
     parser.add_argument('--per_node_batch_size',
                         type=int,
-                        default=Config.per_node_batch_size,
+                        default=config.per_node_batch_size,
                         help='per_node batch size')
     parser.add_argument('--pretrained',
                         type=bool,
-                        default=Config.pretrained,
+                        default=config.pretrained,
                         help='load pretrained model params or not')
     parser.add_argument('--num_classes',
                         type=int,
-                        default=Config.num_classes,
+                        default=config.num_classes,
                         help='model classification num')
     parser.add_argument('--input_image_size',
                         type=int,
-                        default=Config.input_image_size,
+                        default=config.input_image_size,
                         help='input image size')
     parser.add_argument('--num_workers',
                         type=int,
-                        default=Config.num_workers,
+                        default=config.num_workers,
                         help='number of worker to load data')
     parser.add_argument('--resume',
                         type=str,
-                        default=Config.resume,
+                        default=config.resume,
                         help='put the path to resuming file if needed')
     parser.add_argument('--checkpoints',
                         type=str,
-                        default=Config.checkpoint_path,
+                        default=config.checkpoint_path,
                         help='path for saving trained models')
     parser.add_argument('--log',
                         type=str,
-                        default=Config.log,
+                        default=config.log,
                         help='path to save log')
     parser.add_argument('--evaluate',
                         type=str,
-                        default=Config.evaluate,
+                        default=config.evaluate,
                         help='path for evaluate model')
-    parser.add_argument('--seed', type=int, default=Config.seed, help='seed')
+    parser.add_argument('--seed', type=int, default=config.seed, help='seed')
     parser.add_argument('--print_interval',
                         type=bool,
-                        default=Config.print_interval,
+                        default=config.print_interval,
                         help='print interval')
     parser.add_argument('--apex',
                         type=bool,
-                        default=Config.apex,
+                        default=config.apex,
                         help='use apex or not')
     parser.add_argument('--sync_bn',
                         type=bool,
-                        default=Config.sync_bn,
+                        default=config.sync_bn,
                         help='use sync bn or not')
     parser.add_argument('--local_rank',
                         type=int,
@@ -109,15 +116,21 @@ def parse_args():
 
     parser.add_argument('--use_gn',
                         type=bool,
-                        default=Config.use_gn,
+                        default=config.use_gn,
                         help='LOCAL_PROCESS_RANK')
-    parser.add_argument('--version',
-                        type=int,
-                        default=Config.version,
-                        help='current version')
+    
+    
+    parser.add_argument('--freeze',
+                        type=bool,
+                        default=config.freeze,
+                        help='freeze backbone and neck')
+    
+    parser.add_argument('--previous',
+                        type=bool,
+                        default=config.previous,
+                        help='load the previous model')
 
-
-    return parser.parse_args()
+    return parser.parse_args(), config
 
 
 def validate(val_dataset, model, decoder, args):
@@ -199,12 +212,12 @@ def evaluate_coco(val_dataset, model, decoder, args):
         return
 
     json.dump(results,
-              open('{}_bbox_results.json'.format(val_dataset.set_name), 'w'),
+              open('{}_bbox_results_no_freeze.json'.format(val_dataset.set_name), 'w'),
               indent=4)
 
     # load results in COCO evaluation tool
     coco_true = val_dataset.coco
-    coco_pred = coco_true.loadRes('{}_bbox_results.json'.format(
+    coco_pred = coco_true.loadRes('{}_bbox_results_no_freeze.json'.format(
         val_dataset.set_name))
 
     coco_eval = COCOeval(coco_true, coco_pred, 'bbox')
@@ -218,7 +231,7 @@ def evaluate_coco(val_dataset, model, decoder, args):
 
 
 def main():
-    args = parse_args()
+    args, config = parse_args()
     global local_rank
     local_rank = args.local_rank
     if local_rank == 0:
@@ -250,9 +263,9 @@ def main():
     if local_rank == 0:
         logger.info('start loading data')
     train_sampler = torch.utils.data.distributed.DistributedSampler(
-        Config.train_dataset, shuffle=True)
+        config.train_dataset, shuffle=True)
     collater = Collater()
-    train_loader = DataLoader(Config.train_dataset,
+    train_loader = DataLoader(config.train_dataset,
                               batch_size=args.per_node_batch_size,
                               shuffle=False,
                               num_workers=args.num_workers,
@@ -268,14 +281,14 @@ def main():
     })
 
     
-    if args.version == 1:
+    if args.version == 1 or (not config.previous):
         pre_model = torch.load('/home/jovyan/data-vol-polefs-1/yolof_dc5_res50_coco667_withImPre/best.pth', map_location='cpu')
         if local_rank == 0:
             logger.info(f"pretrained_model: {'/home/jovyan/data-vol-polefs-1/yolof_dc5_res50_coco667_withImPre/best.pth'}")
     else:
-        pre_model = torch.load('/home/jovyan/data-vol-polefs-1/small_sample/checkpoints/v{}/best.pth'.format(args.version-1), map_location='cpu')
+        pre_model = torch.load(config.pre_model_dir+'/best.pth', map_location='cpu')
         if local_rank == 0:
-            logger.info(f"pretrained_model: {'/home/jovyan/data-vol-polefs-1/small_sample/checkpoints/v{}/best.pth'.format(args.version-1)}")
+            logger.info(f"pretrained_model: {config.pre_model_dir+'/best.pth'}")
     
     def copyStateDict(state_dict):
         if list(state_dict.keys())[0].startswith('module'):
@@ -302,17 +315,15 @@ def main():
         keys.append(k)
     model.load_state_dict({k:new_dict[k] for k in keys}, strict = False)
 #     model.load_state_dict(pre_model, strict=False)
-    
-    model.scales.requires_grad = False
-    
-    for p in model.backbone.parameters():
-        p.requires_grad = False
-    for p in model.dila_encoder.parameters():
+    if config.freeze:
+        for p in model.backbone.parameters():
             p.requires_grad = False
-    for p in model.trans.parameters():
-            p.requires_grad = False
-    for p in model.c4_out.parameters():
-            p.requires_grad = False
+        for p in model.dila_encoder.parameters():
+                p.requires_grad = False
+        for p in model.trans.parameters():
+                p.requires_grad = False
+        for p in model.c4_out.parameters():
+                p.requires_grad = False
     
     for name, param in model.named_parameters():
         if local_rank == 0:
@@ -327,7 +338,7 @@ def main():
             f"model: '{args.network}', flops: {flops}, params: {params}")
 
     criterion = FCOSLoss(strides=[16],
-                 mi=[[0, 512]]).cuda()
+                 mi=[[-1, 99999]]).cuda()
     decoder = FCOSDecoder(image_w=args.input_image_size,
                           image_h=args.input_image_size, strides=[16]).cuda()
 
@@ -369,7 +380,7 @@ def main():
         model.load_state_dict(checkpoint['model_state_dict'])
         if local_rank == 0:
             logger.info(f"start eval.")
-            all_eval_result = validate(Config.val_dataset, model, decoder,
+            all_eval_result = validate(config.val_dataset, model, decoder,
                                        args)
             logger.info(f"eval done.")
             if all_eval_result is not None:
@@ -413,10 +424,10 @@ def main():
                 f"train: epoch {epoch:0>3d}, cls_loss: {cls_losses:.2f}, reg_loss: {reg_losses:.2f}, center_ness_loss: {center_ness_losses:.2f}, loss: {losses:.2f}"
             )
 
-        if epoch % 6 == 0 or epoch % 24 == 0 or epoch == args.epochs:
+        if epoch % 8 == 0 or epoch % 24 == 0 or epoch == args.epochs:
             if local_rank == 0:
                 logger.info(f"start eval.")
-                all_eval_result = validate(Config.val_dataset, model, decoder,
+                all_eval_result = validate(config.val_dataset, model, decoder,
                                            args)
                 logger.info(f"eval done.")
                 if all_eval_result is not None:
@@ -449,11 +460,11 @@ def main():
             f"finish training, total training time: {training_time:.2f} hours")
     
     
-    if local_rank == 0:
-        print("wait to start find difficult samples!")
-        time.sleep(3)
-        print("start finding difficult samples!")
-        os.system("python ../find_new.py {}".format(args.version + 1))
+#     if local_rank == 0:
+#         print("wait to start find difficult samples!")
+#         time.sleep(5)
+#         print("start finding difficult samples!")
+#         os.system("python ../find_new.py {} {}".format((args.version + 1), config.dataset_annotations_path))
 
 
 def train(train_loader, model, criterion, optimizer, scheduler, epoch, args):
@@ -477,6 +488,7 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, args):
         if cls_loss == 0.0 or reg_loss == 0.0:
             optimizer.zero_grad()
             print("zero")
+            images, annotations = prefetcher.next()
             continue
 #*********************************************************************************************************
         if args.apex:
