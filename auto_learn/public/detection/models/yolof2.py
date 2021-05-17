@@ -171,8 +171,6 @@ class YOLOF(nn.Module):
         self.strides = torch.tensor([16], dtype=torch.float)
         self.positions = FCOSPositions(self.strides)
 
-        self.scales = nn.Parameter(
-            torch.tensor([1.], dtype=torch.float32))
         self.trans = nn.ConvTranspose2d(in_channels=C5_inplanes, out_channels=int(C5_inplanes/2), kernel_size=4, stride=2, padding=1, bias=False)
         self.c4_out = nn.Conv2d(C5_inplanes, C5_inplanes, 1)
 
@@ -192,7 +190,7 @@ class YOLOF(nn.Module):
 
         self.fpn_feature_sizes = []
         cls_heads, reg_heads, center_heads = [], [], []
-        for feature, scale in zip(features, self.scales):
+        for feature in features:
             self.fpn_feature_sizes.append([feature.shape[3], feature.shape[2]])
 
             cls_outs, reg_outs, center_outs = self.clsregcnt_head(feature)
@@ -202,7 +200,7 @@ class YOLOF(nn.Module):
             cls_heads.append(cls_outs)
             # [N,4,H,W] -> [N,H,W,4]
             reg_outs = reg_outs.permute(0, 2, 3, 1).contiguous()
-            reg_outs = reg_outs * torch.exp(scale)
+            reg_outs = reg_outs * torch.exp(torch.tensor([1],dtype=torch.float32, device=device))
             reg_heads.append(reg_outs)
             # [N,1,H,W] -> [N,H,W,1]
             center_outs = center_outs.permute(0, 2, 3, 1).contiguous()
